@@ -6,7 +6,7 @@ This library is a simple touchscreen user interface for building Teensy applicat
 
 
 ## Documentation:
-Documentation for the *Teensy User Interface* library can be found at:
+Documentation and code for the *Teensy User Interface* library can be found at:
 
 ​    https://github.com/Stan-Reifel/TeensyUserInterface
 

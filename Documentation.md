@@ -319,7 +319,7 @@ void commandOKButtonExample(void)
 
 Frequently applications need the user to input one or more numeric values.  For this purpose, the library makes use of *Number Boxes*.  A Number Box is a widget that can be added to a screen of your own design.  You can place just one, or several as shown below.  Touching the *Up* and *Down* buttons allow the user to set the number.  When you place a Number Box, you specify the Min and Max values, along with a Step value.   There are two types of Number Boxes, one for INTs and one for FLOATs.  The designer of this screen placed two INT Number Boxes, two FLOAT Number Boxes, and two buttons.
 
-![alt_text](images\NumberBox.jpg  "Number boxes")
+![alt_text](images/NumberBox.jpg  "Number boxes")
 
 
 
@@ -404,7 +404,7 @@ Creating a FLOAT Number Box is very similar to the INT example above.  The main 
 
 Another widget that can be added to your screen is a *Selection Box*.  Selection Boxes allow the user to pick one of 2, 3, or 4 choices.  The image below shows a typical configuration screen that uses three Selection Boxes, along with the *Back* button. 
 
-![alt_text](images\SelectionBox.jpg  "Selection boxes")
+![alt_text](images/SelectionBox.jpg  "Selection boxes")
 
 
 

@@ -3,7 +3,7 @@
 //      *                                                                *
 //      *          Example to shows how to create a simple menu          *
 //      *                                                                *
-//      *            S. Reifel & Co.                8/8/2019             *
+//      *            S. Reifel & Co.                2/18/2022            *
 //      *                                                                *
 //      ******************************************************************
 
@@ -67,9 +67,16 @@ TeensyUserInterface ui;
 void setup() 
 {
   //
+  // pin numbers used in addition to the default SPI pins
+  //
+  const int LCD_CS_PIN = 10;
+  const int LCD_DC_PIN = 9;
+  const int TOUCH_CS_PIN = 8;
+  
+  //
   // setup the LCD orientation, the default font and initialize the user interface
   //
-  ui.begin(LCD_ORIENTATION_LANDSCAPE_4PIN_RIGHT, Arial_9_Bold);
+  ui.begin(LCD_CS_PIN, LCD_DC_PIN, TOUCH_CS_PIN, LCD_ORIENTATION_LANDSCAPE_4PIN_RIGHT, Arial_9_Bold);
 }
 
 

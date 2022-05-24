@@ -4,7 +4,7 @@
 //      *     Example to shows how to set the display's orientation      *
 //      *             choose between Portrait and Landscape              *
 //      *                                                                *
-//      *            S. Reifel & Co.                8/8/2019             *
+//      *            S. Reifel & Co.                2/18/2022            *
 //      *                                                                *
 //      ******************************************************************
 
@@ -66,10 +66,18 @@ TeensyUserInterface ui;
 void setup() 
 {
   //
+  // pin numbers used in addition to the default SPI pins
+  //
+  const int LCD_CS_PIN = 10;
+  const int LCD_DC_PIN = 9;
+  const int TOUCH_CS_PIN = 8;
+
+  
+  //
   // this is where you set the display's orientation, choosing between Portrait 
   // and Landscape modes by uncommenting the one you want
   //
-  ui.begin(LCD_ORIENTATION_PORTRAIT_4PIN_TOP, Arial_9_Bold);
+  ui.begin(LCD_CS_PIN, LCD_DC_PIN, TOUCH_CS_PIN, LCD_ORIENTATION_PORTRAIT_4PIN_TOP, Arial_9_Bold);
 //  ui.begin(LCD_ORIENTATION_LANDSCAPE_4PIN_LEFT, Arial_9_Bold);
 //  ui.begin(LCD_ORIENTATION_PORTRAIT_4PIN_BOTTOM, Arial_9_Bold);
 //  ui.begin(LCD_ORIENTATION_LANDSCAPE_4PIN_RIGHT, Arial_9_Bold);

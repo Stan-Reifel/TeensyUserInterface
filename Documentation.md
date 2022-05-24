@@ -24,7 +24,7 @@ The heart of this user interface are menus.  Menus are displayed in rows and col
 
 ##### Hardware:
 
-This user interface works with Teensy microcontrollers along with a 2.8" 320x240 ILI9341 LCD touch screen display.  These displays are very inexpensive and easy to hookup.  This library has only been tested with a *Teensy 3.6* but will likely work with most of the Teensy family.
+This user interface works with Teensy microcontrollers along with a 2.8" 320x240 ILI9341 LCD touch screen display.  These displays are very inexpensive and easy to hookup.  This library has only been tested with a *Teensy 3.6* and *Teensy 4.1* but will likely work with much of the Teensy family.
 
 ![alt_text](images/LCD_Display.jpg "Touch screen display")
 
@@ -38,11 +38,9 @@ The Touchscreen LCDs can be purchased online from many sources, including:
 
 
 
-Here is how to wire the LCD to the Teensy:
+Here is how to wire the LCD to the Teensy 3.6 and Teensy 4.1:
 
 ![alt_text](images/HookupGuide-770.png "Hookup Guide")
-
-
 
 | Teensy |  Display  |
 | :----: | :-------: |
@@ -59,8 +57,6 @@ Here is how to wire the LCD to the Teensy:
 |   D8   | TOUCH CS  |
 |  D11   | TOUCH DIN |
 |  D12   | TOUCH DO  |
-
-
 
 
 
@@ -601,15 +597,18 @@ Note 2: You need to manage where in EEPROM each of your values is stored.  Your 
 ```
 //
 // initialize the UI, display hardware and touchscreen hardware
-//  Enter:  lcdOrientation = 
-//                       LCD_ORIENTATION_PORTRAIT_4PIN_TOP, 
+//  Enter:  lcdCSPin = pin number for the LCD's CS pin
+//          LcdDCPin = pin number for the LCD's DC pin
+//          TouchScreenCSPin = pin number for the touchscreen's CS pin
+//          lcdOrientation = 
+//                       LCD_ORIENTATION_PORTRAIT_4PIN_TOP 
 //                       LCD_ORIENTATION_LANDSCAPE_4PIN_LEFT
-//                       LCD_ORIENTATION_PORTRAIT_4PIN_BOTTOM, 
+//                       LCD_ORIENTATION_PORTRAIT_4PIN_BOTTOM 
 //                       LCD_ORIENTATION_LANDSCAPE_4PIN_RIGHT
 //          font -> the font typeface to load, ei: Arial_10
 //
-void TeensyUserInterface::begin(int lcdOrientation, const ui_font &font)
-
+void TeensyUserInterface::begin(int lcdCSPin, int LcdDCPin, int TouchScreenCSPin, 
+                                int lcdOrientation, const ui_font &font)
 
 //
 // set color palette to Blue
@@ -621,6 +620,19 @@ void TeensyUserInterface::setColorPaletteBlue(void)
 // set color palette to Gray
 //
 void TeensyUserInterface::setColorPaletteGray(void)
+
+
+//
+// set the orientation of the lcd and touch screen, this can be called to change 
+// the orientation after it is initially set
+//  Enter:  lcdOrientation = 
+//                       LCD_ORIENTATION_PORTRAIT_4PIN_TOP 
+//                       LCD_ORIENTATION_LANDSCAPE_4PIN_LEFT
+//                       LCD_ORIENTATION_PORTRAIT_4PIN_BOTTOM 
+//                       LCD_ORIENTATION_LANDSCAPE_4PIN_RIGHT
+//
+void TeensyUserInterface::setOrientation(int lcdOrientation)
+
 ```
 
 
@@ -656,6 +668,23 @@ void TeensyUserInterface::setMenuFont(const ui_font &font)
 //  Enter:  menu -> the menu to display
 //
 void TeensyUserInterface::displayAndExecuteMenu(MENU_ITEM *menu)
+
+
+//
+// select and display a menu or submenu, for most applications this function is not used
+//  Enter:  menu -> the menu to display
+//          drawMenuFlg = true if should draw the new menu
+//
+void TeensyUserInterface::selectAndDrawMenu(MENU_ITEM *menu, boolean drawMenuFlg)
+
+
+//
+// set a callback function that's periodically executed while the application 
+// is showing a menu, for most applications setting a callback function is not needed
+//  Enter:  callbackFunction -> function to execute continuously while a menu is presented,
+//            set to NULL to disable
+//
+void TeensyUserInterface::setInMenuCallbackFunction(void (*callbackFunction)())
 ```
 
 
@@ -958,7 +987,7 @@ typedef struct
 
 
 
-### Select Box functions:
+### Selection Box functions:
 
 ```
 //
@@ -1152,6 +1181,19 @@ void TeensyUserInterface::lcdDrawTriangle(int x0, int y0, int x1, int y1,
 //
 void TeensyUserInterface::lcdDrawFilledCircle(int x, int y, int radius, 
   uint16_t color)
+
+
+
+//
+// draw an image
+//  Enter:  x, y = coords of upper left corner on LCD where the image will be displayed
+//          width, height =  size of the image, this must be the same as the image data
+//          image -> image data, 2 bytes/pixel in the RGB565 format stored in PROGMEM
+// Note: use this utility to convert an image to C sourse code:
+//       www.rinkydinkelectronics.com/_t_doimageconverter565.php
+//
+void TeensyUserInterface::lcdDrawImage(int x, int y, int width, int height, 
+  const uint16_t *image)
 
 
 //
@@ -1384,5 +1426,5 @@ float TeensyUserInterface::readConfigurationFloat(int EEPromAddress,
 
 
 
-Copyright (c) 2019 S. Reifel & Co.  -   Licensed under the MIT license.
+Copyright (c) 2022 S. Reifel & Co.  -   Licensed under the MIT license.
 

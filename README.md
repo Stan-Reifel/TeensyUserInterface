@@ -14,4 +14,4 @@ Documentation and code for the *Teensy User Interface* library can be found at:
 
 ## License:
 
-Copyright (c) 2019 S. Reifel & Co.   -   Licensed under the MIT license.
+Copyright (c) 2022 S. Reifel & Co.   -   Licensed under the MIT license.

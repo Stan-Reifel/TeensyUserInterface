@@ -2,14 +2,14 @@
 //      *                                                                *
 //      *            Header file for TeensyUserInterface.cpp             *
 //      *                                                                *
-//      *              Copyright (c) S. Reifel & Co,  2014               *
+//      *              Copyright (c) S. Reifel & Co,  2022               *
 //      *                                                                *
 //      ******************************************************************
 
 
 // MIT License
 // 
-// Copyright (c) 2014 Stanley Reifel & Co.
+// Copyright (c) 2022 Stanley Reifel & Co.
 // 
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -231,13 +231,16 @@ class TeensyUserInterface
     // public functions
     //
     TeensyUserInterface(void);
-    void begin(int lcdOrientation, const ui_font &font);
+    void begin(int lcdCSPin, int LcdDCPin, int TouchScreenCSPin, int lcdOrientation, const ui_font &font);
+    void setOrientation(int lcdOrientation);
     void setColorPaletteBlue(void);
     void setColorPaletteGray(void);
 
     void setMenuColors(uint16_t _menuBackgroundColor, uint16_t _menuButtonColor, uint16_t _menuButtonSelectedColor, uint16_t _menuButtonFrameColor, uint16_t _menuButtonTextColor);
     void setMenuFont(const ui_font &font);
+    void selectAndDrawMenu(MENU_ITEM *menu, boolean drawMenuFlg);
     void displayAndExecuteMenu(MENU_ITEM *menu);
+    void setInMenuCallbackFunction(void (*callbackFunction)());
  
     void setTitleBarColors(uint16_t _titleBarColor, uint16_t _titleBarTextColor, uint16_t _titleBarBackButtonColor, uint16_t _titleBarBackButtonSelectedColor);
     void setTitleBarFont(const ui_font &font);
@@ -255,6 +258,7 @@ class TeensyUserInterface
     void drawButton(BUTTON_EXTENDED &uiButtonExt, boolean buttonSelectedFlg);
     void drawButton(const char *buttonText, boolean buttonSelectedFlg, int buttonX, int buttonY, int buttonWidth, int buttonHeight);
     void drawButton(const char *buttonText, int buttonX, int buttonY, int buttonWidth, int buttonHeight, uint16_t buttonColor, uint16_t buttonFrameColor, uint16_t buttonTextColor, const ui_font &buttonFont);
+    boolean breakStringAtWhiteSpace(const char *srcString, int *srcIndex, char *destString, int destBufferLength, int breakAtWhiteCount);
     boolean checkForButtonClicked(BUTTON &uiButton);
     boolean checkForButtonClicked(BUTTON_EXTENDED &uiButton);
     boolean checkForButtonAutoRepeat(BUTTON &uiButton);
@@ -289,6 +293,7 @@ class TeensyUserInterface
     void lcdDrawFilledRoundedRectangle(int x, int y, int width, int height, int radius, uint16_t color);
     void lcdDrawFilledTriangle(int x0, int y0, int x1, int y1, int x2, int y2, uint16_t color);
     void lcdDrawFilledCircle(int x, int y, int radius, uint16_t color);
+    void lcdDrawImage(int x, int y, int width, int height, const uint16_t *image);
     void lcdSetFont(const ui_font &font);
     void lcdSetFontColor(uint16_t color);
     void lcdPrint(char *s);
@@ -329,6 +334,7 @@ class TeensyUserInterface
     //
     MENU_ITEM *currentMenuTable;
     const ui_font *currentFont;
+    void (*inMenuCallbackFunction)();
 
     uint16_t titleBarColor;
     uint16_t titleBarTextColor;
@@ -357,7 +363,6 @@ class TeensyUserInterface
     // private functions
     //
     void executeMenuItem(int menuIdx);
-    void selectAndDrawMenu(MENU_ITEM *menu);
     void drawMenu(void);
     void drawMenuItem(int menuIdx, boolean buttonSelectedFlg);
     int findMenuButtonForTouchEvent(void);
@@ -385,9 +390,11 @@ class TeensyUserInterface
     int countSelectionBoxChoices(SELECTION_BOX &selectionBox);
 
     void touchScreenInitialize(int lcdOrientation);
+    void touchScreenSetOrientation(int lcdOrientation);
     boolean getRAWTouchScreenCoords(int *xRaw, int *yRaw);
      
     void lcdInitialize(int lcdOrientation, const ui_font &font);
+    void lcdSetOrientation(int lcdOrientation);
 };
 
 // ------------------------------------ End ---------------------------------

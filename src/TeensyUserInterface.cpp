@@ -2,15 +2,15 @@
 //      *                                                                *
 //      *                      Teensy User Interface                     *
 //      *                                                                *
-//      *            Stan Reifel                      3/3/2019           *
-//      *               Copyright (c) S. Reifel & Co, 2019               *
+//      *            Stan Reifel                      5/20/2022          *
+//      *               Copyright (c) S. Reifel & Co, 2022               *
 //      *                                                                *
 //      ******************************************************************
 
 
 // MIT License
 // 
-// Copyright (c) 2014 Stanley Reifel & Co.
+// Copyright (c) 2022 Stanley Reifel & Co.
 // 
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -129,7 +129,7 @@
 // "Cancel", but can also be used to execute other commands such as "Start" or "Stop".
 //
 // Number Boxes:  Number boxes allow the user to enter a number by pressing Up and 
-// Down.  Numbers can be integers or floats.
+// Down.  Numbers can be integers or floats->
 //
 // Selection Boxes:  Selection boxes present choices to the user to pick between, 
 // such as On / Off; or Low / Medium / High
@@ -140,7 +140,7 @@
 // Arial fonts that look best are: 8, 8Bold, 9, 9Bold, 12Bold, 13
 //
 //
-// Hooking up the Teensy 3.6 to the LCD Touchscreen:
+// Hooking up the Teensy 3.6 and 4.1 to the LCD Touchscreen:
 //    Teensy VIN        LCD VCC
 //    Teensy GND        LCD GND
 //    Teensy D10        LCD CS
@@ -165,18 +165,10 @@
 
 
 //
-// pin assignments, note: the LCD also uses hardware SPI with MOSI pin 11, MISO pin 12, SCK pin 13
+// pointers to the LCD and Touch objects
 //
-const byte LCD_DC_PIN = 9;
-const byte LCD_CS_PIN = 10;
-const byte TOUCH_CS_PIN = 8;
-
-
-//
-// create the LCD and Touch objects
-//
-ILI9341_t3 lcd = ILI9341_t3(LCD_CS_PIN, LCD_DC_PIN);
-XPT2046_Touchscreen ts(TOUCH_CS_PIN);
+ILI9341_t3 *lcd;
+XPT2046_Touchscreen *ts;
 
 //
 // the size of features for drawing the user interface
@@ -200,12 +192,21 @@ TeensyUserInterface::TeensyUserInterface(void)
 
 //
 // initialize the UI, display hardware and touchscreen hardware
-//  Enter:  lcdOrientation = LCD_ORIENTATION_PORTRAIT_4PIN_TOP, LCD_ORIENTATION_LANDSCAPE_4PIN_LEFT
+//  Enter:  lcdCSPin = pin number for the LCD's CS pin
+//          LcdDCPin = pin number for the LCD's DC pin
+//          TouchScreenCSPin = pin number for the touchscreen's CS pin
+//          lcdOrientation = LCD_ORIENTATION_PORTRAIT_4PIN_TOP, LCD_ORIENTATION_LANDSCAPE_4PIN_LEFT
 //                           LCD_ORIENTATION_PORTRAIT_4PIN_BOTTOM, LCD_ORIENTATION_LANDSCAPE_4PIN_RIGHT
 //          font -> the font typeface to load, ei: Arial_10
 //
-void TeensyUserInterface::begin(int lcdOrientation, const ui_font &font)
+void TeensyUserInterface::begin(int lcdCSPin, int LcdDCPin, int TouchScreenCSPin, int lcdOrientation, const ui_font &font)
 {
+  //
+  // create the LCD and touchscreen objects
+  //
+  lcd = new ILI9341_t3(lcdCSPin, LcdDCPin);
+  ts = new XPT2046_Touchscreen(TouchScreenCSPin);
+  
   //
   // initialize the LCD and touch screen hardware
   //
@@ -213,7 +214,41 @@ void TeensyUserInterface::begin(int lcdOrientation, const ui_font &font)
   touchScreenInitialize(lcdOrientation);
 
   //
-  // initialize the user interface
+  // set the orientation for the screen
+  //
+  setOrientation(lcdOrientation);
+  
+  //
+  // set some default colors and fonts for the UI
+  //
+  setColorPaletteBlue();
+  setTitleBarFont(font);
+  setMenuFont(font);
+
+  //
+  // disable the callback function executed while in a menu
+  //
+  inMenuCallbackFunction = NULL;
+}
+
+
+
+//
+// set the orientation of the lcd and touch screen, this can be called to change 
+// the orientation after it is initially set
+//  Enter:  lcdOrientation = LCD_ORIENTATION_PORTRAIT_4PIN_TOP, LCD_ORIENTATION_LANDSCAPE_4PIN_LEFT
+//                           LCD_ORIENTATION_PORTRAIT_4PIN_BOTTOM, LCD_ORIENTATION_LANDSCAPE_4PIN_RIGHT
+//
+void TeensyUserInterface::setOrientation(int lcdOrientation)
+{
+  //
+  // set the orientation of the hardware
+  //
+  lcdSetOrientation(lcdOrientation);
+  touchScreenSetOrientation(lcdOrientation);
+
+  //
+  // set the orientation used by the software
   //
   displaySpaceWidth = lcdWidth - 2;
   displaySpaceHeight = lcdHeight - titleBarHeight - 1;
@@ -223,13 +258,6 @@ void TeensyUserInterface::begin(int lcdOrientation, const ui_font &font)
   displaySpaceBottomY = displaySpaceTopY + displaySpaceHeight - 1;
   displaySpaceCenterX = displaySpaceLeftX + displaySpaceWidth/2;
   displaySpaceCenterY = displaySpaceTopY + displaySpaceHeight/2;
-
-  //
-  // set some default colors and fonts for the UI
-  //
-  setColorPaletteBlue();
-  setTitleBarFont(font);
-  setMenuFont(font);
 }
 
 
@@ -318,7 +346,7 @@ void TeensyUserInterface::displayAndExecuteMenu(MENU_ITEM *menu)
   //
   // display the top level menu
   //
-  selectAndDrawMenu(menu);
+  selectAndDrawMenu(menu, true);
  
   //
   // check for screen touches and execute menu commands
@@ -326,60 +354,84 @@ void TeensyUserInterface::displayAndExecuteMenu(MENU_ITEM *menu)
   while(true)
   {
     //
-    // get new button events
+    // check if there is a new Touch Event
     //
     getTouchEvents();
-    if (touchEventType == TOUCH_NO_EVENT)
-      continue;
-
-    //
-    // check if user has pressed the menu's "Back" button on the title bar
-    //
-    if (checkForBackButtonClicked())
+    if (touchEventType != TOUCH_NO_EVENT)
     {
       //
-      // the menu's Back button pushed, get this menu's type
+      // check if user has pressed the menu's "Back" button on the title bar
       //
-      int menuItemType = currentMenuTable[0].MenuItemType;
-
-      //
-      // if this is a sub menu, select this menu's parent menu
-      //
-      if (menuItemType == MENU_ITEM_TYPE_SUB_MENU_HEADER)
+      if (checkForBackButtonClicked())
       {
-        parentMenu = currentMenuTable[0].MenuItemSubMenu;
-        selectAndDrawMenu(parentMenu);
-        continue;
+        //
+        // the menu's Back button pushed, get this menu's type
+        //
+        int menuItemType = currentMenuTable[0].MenuItemType;
+  
+        //
+        // if this is a sub menu, select this menu's parent menu
+        //
+        if (menuItemType == MENU_ITEM_TYPE_SUB_MENU_HEADER)
+        {
+          parentMenu = currentMenuTable[0].MenuItemSubMenu;
+          selectAndDrawMenu(parentMenu, true);
+          continue;
+        }
+  
+        //
+        // if this is the Main menu, exit the menus and return to the app
+        //
+        if (menuItemType == MENU_ITEM_TYPE_MAIN_MENU_HEADER)
+        {
+          parentMenu = currentMenuTable[0].MenuItemSubMenu;
+          if (parentMenu == NULL)
+            return;
+          continue;
+        }
       }
-
+  
       //
-      // if this is the Main menu, exit the menus and return to the app
+      // check if user has pressed one of the menu's buttons
       //
-      if (menuItemType == MENU_ITEM_TYPE_MAIN_MENU_HEADER)
+      menuIdx = findMenuButtonForTouchEvent();
+      if (menuIdx > 0)
       {
-        parentMenu = currentMenuTable[0].MenuItemSubMenu;
-        if (parentMenu == NULL)
-          return;
-        continue;
+        if (touchEventType == TOUCH_PUSHED_EVENT)
+          drawMenuItem(menuIdx, true);
+  
+        if (touchEventType == TOUCH_RELEASED_EVENT)
+        {
+          drawMenuItem(menuIdx, false);
+          executeMenuItem(menuIdx);
+        }
       }
     }
-
+    
     //
-    // check if user has pressed one of the menu's buttons
+    // check if there is a callback function to execute while in a menu
     //
-    menuIdx = findMenuButtonForTouchEvent();
-    if (menuIdx > 0)
+    if (inMenuCallbackFunction != NULL)
     {
-      if (touchEventType == TOUCH_PUSHED_EVENT)
-        drawMenuItem(menuIdx, true);
-
-      if (touchEventType == TOUCH_RELEASED_EVENT)
-      {
-        drawMenuItem(menuIdx, false);
-        executeMenuItem(menuIdx);
-      }
+      //
+      // there is a call back function, so execute it
+      //
+      (inMenuCallbackFunction)();
     }
   }
+}
+
+
+
+//
+// set a callback function that's periodically executed while the application 
+// is showing a menu, for most applications setting a callback function is not needed
+//  Enter:  callbackFunction -> function to execute continuously while a menu is presented,
+//            set to NULL to disable
+//
+void TeensyUserInterface::setInMenuCallbackFunction(void (*callbackFunction)())
+{
+  inMenuCallbackFunction = callbackFunction;
 }
 
 
@@ -403,7 +455,7 @@ void TeensyUserInterface::executeMenuItem(int menuIdx)
     case MENU_ITEM_TYPE_SUB_MENU:
     {
       subMenu = currentMenuTable[menuIdx].MenuItemSubMenu;
-      selectAndDrawMenu(subMenu);
+      selectAndDrawMenu(subMenu, true);
       break;
     }
     
@@ -420,7 +472,7 @@ void TeensyUserInterface::executeMenuItem(int menuIdx)
       //
       // display the menu again
       //
-      selectAndDrawMenu(currentMenuTable);
+      selectAndDrawMenu(currentMenuTable, true);
       break;
     }
     
@@ -439,15 +491,22 @@ void TeensyUserInterface::executeMenuItem(int menuIdx)
 
 
 //
-// select and display a menu or submenu
+// select and display a menu or submenu, for most applications this function is not used
 //  Enter:  menu -> the menu to display
+//          drawMenuFlg = true if should draw the new menu
 //
-void TeensyUserInterface::selectAndDrawMenu(MENU_ITEM *menu)
+void TeensyUserInterface::selectAndDrawMenu(MENU_ITEM *menu, boolean drawMenuFlg)
 {   
   //
   // remember the currently selected menu
   //
   currentMenuTable = menu;
+
+  //
+  // check if drawing the menu, if not return
+  //
+  if (!drawMenuFlg)
+    return;
 
   //
   // draw the title bar, decide if should include the "Back" button (don't show the 
@@ -1217,6 +1276,17 @@ void TeensyUserInterface::drawButton(const char *labelText, int buttonX, int but
   int buttonHeight, uint16_t buttonColor, uint16_t buttonFrameColor, uint16_t buttonTextColor, 
   const ui_font &buttonFont)
 {
+  const int buttonTextBufferLength = 40;
+  char buttonTextBufferLine1[buttonTextBufferLength];
+  const char *buttonTextLine2;
+  int srcIndexStart;
+  int srcIndex;
+  int breakAtWhiteCount;
+  boolean finishedFlg;
+  int maxTextWidthInPixels;
+  int textWidthInPixels;
+  int lineCount;
+  
   //
   // draw the button's face with raised edges
   //
@@ -1225,12 +1295,116 @@ void TeensyUserInterface::drawButton(const char *labelText, int buttonX, int but
   lcdDrawFilledRectangle(buttonX+1, buttonY+1, buttonWidth-1, buttonHeight-1, buttonColor);
 
   //
-  // draw the text on the button
+  // break the button's text into 1 or 2 lines insuring that the text fits on the button
+  //
+  maxTextWidthInPixels = buttonWidth - 8;
+  lineCount = 1;
+
+  //
+  // find the first line
+  //
+  srcIndexStart = 0;
+  breakAtWhiteCount = 1;
+  buttonTextBufferLine1[0] = 0;
+  while(true)
+  {
+    srcIndex = srcIndexStart;
+    finishedFlg = breakStringAtWhiteSpace(labelText, &srcIndex, buttonTextBufferLine1, buttonTextBufferLength, breakAtWhiteCount);
+    textWidthInPixels = lcdStringWidthInPixels(buttonTextBufferLine1);
+   
+    if ((textWidthInPixels > maxTextWidthInPixels) && (breakAtWhiteCount == 1))
+      break;
+ 
+    if ((textWidthInPixels < maxTextWidthInPixels) && (!finishedFlg))
+    {
+      breakAtWhiteCount++;
+      continue;
+    }
+ 
+    if ((textWidthInPixels <= maxTextWidthInPixels) && (finishedFlg))
+      break;
+   
+    if (textWidthInPixels > maxTextWidthInPixels)
+    {
+      breakAtWhiteCount--;
+      srcIndex = srcIndexStart;
+      finishedFlg = breakStringAtWhiteSpace(labelText, &srcIndex, buttonTextBufferLine1, buttonTextBufferLength, breakAtWhiteCount);
+      break;
+    }
+
+    break;
+  }
+
+
+  //
+  // check if there is a second line
+  //
+  if (!finishedFlg)
+  {
+    lineCount++;
+    buttonTextLine2 = labelText + srcIndex;
+  }
+
+
+  //
+  // draw the text on the button, either 1 line or two
   //
   lcdSetFont(buttonFont);
-  lcdSetCursorXY(buttonX + buttonWidth/2, buttonY + (buttonHeight / 2) - (lcdGetFontHeightWithoutDecenders()/2));  
   lcdSetFontColor(buttonTextColor);
-  lcdPrintCentered(labelText);
+
+  if (lineCount == 1)
+  {
+    lcdSetCursorXY(buttonX + buttonWidth/2, buttonY + (buttonHeight / 2) - (lcdGetFontHeightWithoutDecenders()/2));  
+    lcdPrintCentered(buttonTextBufferLine1);
+  }
+
+  else
+  {
+    lcdSetCursorXY(buttonX + buttonWidth/2, buttonY + (buttonHeight / 2) - (4 + lcdGetFontHeightWithoutDecenders()));  
+    lcdPrintCentered(buttonTextBufferLine1);
+
+    lcdSetCursorXY(buttonX + buttonWidth/2, buttonY + (buttonHeight / 2) + 2);  
+    lcdPrintCentered(buttonTextLine2);
+  }
+}
+
+
+
+//
+// copy string until the nth white space character
+//    Exit:   true returned if up to the end of the srcString has been copied
+//
+boolean TeensyUserInterface::breakStringAtWhiteSpace(const char *srcString, int *srcIndex, char *destString, int destBufferLength, int breakAtWhiteCount)
+{
+  int destIndex = 0;
+  while(true)
+  {
+    char c = srcString[*srcIndex];
+    *srcIndex = *srcIndex + 1;
+
+    if (c == 0)
+    {
+      destString[destIndex] = 0;
+      return(true);
+    }
+   
+    if (c == ' ')
+    {
+      breakAtWhiteCount--;
+      if (breakAtWhiteCount == 0)
+      {
+        destString[destIndex] = 0;
+        return(false);
+      }
+    }
+
+    destString[destIndex++] = c;
+    if (destIndex >= destBufferLength-1)
+    {
+        destString[destIndex] = 0;
+        return(true);
+    }
+  }
 }
 
 
@@ -2454,8 +2628,20 @@ const long TOUCH_AUTO_REPEAT_RATE = 120;
 //
 void TeensyUserInterface::touchScreenInitialize(int lcdOrientation)
 {
-  ts.begin();
-  ts.setRotation((lcdOrientation + 2) % 4);
+  ts->begin();
+  touchScreenSetOrientation(lcdOrientation);
+}
+
+
+
+//
+// set the touch screen orientation
+//  Enter:  lcdOrientation = LCD_ORIENTATION_PORTRAIT_4PIN_TOP, LCD_ORIENTATION_LANDSCAPE_4PIN_LEFT
+//                           LCD_ORIENTATION_PORTRAIT_4PIN_BOTTOM, LCD_ORIENTATION_LANDSCAPE_4PIN_RIGHT
+//
+void TeensyUserInterface::touchScreenSetOrientation(int lcdOrientation)
+{
+  ts->setRotation((lcdOrientation + 2) % 4);
   setDefaultTouchScreenCalibrationConstants(lcdOrientation);
   touchState = WAITING_FOR_TOUCH_DOWN_STATE;
 }
@@ -2755,13 +2941,13 @@ boolean TeensyUserInterface::getRAWTouchScreenCoords(int *xRaw, int *yRaw)
   //
   // check if the screen is currently being touched
   //
-  if (ts.touched() == false)
+  if (ts->touched() == false)
     return(false);
 
   //
   // get the raw coordinates and return them
   //
-  TS_Point rawTouchPoint = ts.getPoint();
+  TS_Point rawTouchPoint = ts->getPoint();
 
   *xRaw = rawTouchPoint.x;
   *yRaw = rawTouchPoint.y;
@@ -2781,15 +2967,26 @@ boolean TeensyUserInterface::getRAWTouchScreenCoords(int *xRaw, int *yRaw)
 //
 void TeensyUserInterface::lcdInitialize(int lcdOrientation, const ui_font &font)
 {
-  lcd.begin();
-  lcd.setRotation(lcdOrientation);
+  lcd->begin();
+  lcdSetOrientation(lcdOrientation);
   lcdClearScreen(LCD_BLACK);
   lcdSetFontColor(LCD_WHITE);  
   lcdSetFont(font);
-  lcdSetCursorXY(0, 0);
+}
 
-  lcdWidth = lcd.width();
-  lcdHeight = lcd.height();
+
+
+//
+// set the LCD display's orientation
+//  Enter:  lcdOrientation = LCD_ORIENTATION_PORTRAIT_4PIN_TOP, LCD_ORIENTATION_LANDSCAPE_4PIN_LEFT
+//                           LCD_ORIENTATION_PORTRAIT_4PIN_BOTTOM, LCD_ORIENTATION_LANDSCAPE_4PIN_RIGHT
+//
+void TeensyUserInterface::lcdSetOrientation(int lcdOrientation)
+{
+  lcd->setRotation(lcdOrientation);
+  lcdWidth = lcd->width();
+  lcdHeight = lcd->height();
+  lcdSetCursorXY(0, 0);
 }
 
 
@@ -2800,7 +2997,7 @@ void TeensyUserInterface::lcdInitialize(int lcdOrientation, const ui_font &font)
 //
 void TeensyUserInterface::lcdClearScreen(uint16_t color)
 {
-  lcd.fillScreen(color);
+  lcd->fillScreen(color);
 }
 
 
@@ -2812,7 +3009,7 @@ void TeensyUserInterface::lcdClearScreen(uint16_t color)
 //
 void TeensyUserInterface::lcdDrawPixel(int x, int y, uint16_t color)
 {
-  lcd.drawPixel(x, y, color);
+  lcd->drawPixel(x, y, color);
 }
 
 
@@ -2825,7 +3022,7 @@ void TeensyUserInterface::lcdDrawPixel(int x, int y, uint16_t color)
 //
 void TeensyUserInterface::lcdDrawLine(int x1, int y1, int x2, int y2, uint16_t color)
 {
-  lcd.drawLine(x1, y1, x2, y2, color);
+  lcd->drawLine(x1, y1, x2, y2, color);
 }
 
 
@@ -2838,7 +3035,7 @@ void TeensyUserInterface::lcdDrawLine(int x1, int y1, int x2, int y2, uint16_t c
 //
 void TeensyUserInterface::lcdDrawHorizontalLine(int x, int y, int length, uint16_t color)
 {
-  lcd.drawFastHLine(x, y, length, color);
+  lcd->drawFastHLine(x, y, length, color);
 }
 
 
@@ -2851,7 +3048,7 @@ void TeensyUserInterface::lcdDrawHorizontalLine(int x, int y, int length, uint16
 //
 void TeensyUserInterface::lcdDrawVerticalLine(int x, int y, int length, uint16_t color)
 {
-  lcd.drawFastVLine(x, y, length, color);
+  lcd->drawFastVLine(x, y, length, color);
 }
 
 
@@ -2865,7 +3062,7 @@ void TeensyUserInterface::lcdDrawVerticalLine(int x, int y, int length, uint16_t
 //
 void TeensyUserInterface::lcdDrawRectangle(int x, int y, int width, int height, uint16_t color)
 {
-  lcd.drawRect(x, y, width, height, color);
+  lcd->drawRect(x, y, width, height, color);
 }
 
 
@@ -2880,7 +3077,7 @@ void TeensyUserInterface::lcdDrawRectangle(int x, int y, int width, int height, 
 //
 void TeensyUserInterface::lcdDrawRoundedRectangle(int x, int y, int width, int height, int radius, uint16_t color)
 {
-  lcd.drawRoundRect(x, y, width, height, radius, color);
+  lcd->drawRoundRect(x, y, width, height, radius, color);
 }
 
 
@@ -2894,7 +3091,7 @@ void TeensyUserInterface::lcdDrawRoundedRectangle(int x, int y, int width, int h
 //
 void TeensyUserInterface::lcdDrawTriangle(int x0, int y0, int x1, int y1, int x2, int y2, uint16_t color)
 {
-  lcd.drawTriangle(x0, y0, x1, y1, x2, y2, color);
+  lcd->drawTriangle(x0, y0, x1, y1, x2, y2, color);
 }
 
 
@@ -2907,7 +3104,7 @@ void TeensyUserInterface::lcdDrawTriangle(int x0, int y0, int x1, int y1, int x2
 //
 void TeensyUserInterface::lcdDrawCircle(int x, int y, int radius, uint16_t color)
 {
-  lcd.drawCircle(x, y, radius, color);
+  lcd->drawCircle(x, y, radius, color);
 }
 
 
@@ -2921,7 +3118,7 @@ void TeensyUserInterface::lcdDrawCircle(int x, int y, int radius, uint16_t color
 //
 void TeensyUserInterface::lcdDrawFilledRectangle(int x, int y, int width, int height, uint16_t color)
 {
-  lcd.fillRect(x, y, width, height, color);
+  lcd->fillRect(x, y, width, height, color);
 }
 
 
@@ -2936,7 +3133,7 @@ void TeensyUserInterface::lcdDrawFilledRectangle(int x, int y, int width, int he
 //
 void TeensyUserInterface::lcdDrawFilledRoundedRectangle(int x, int y, int width, int height, int radius, uint16_t color)
 {
-  lcd.fillRoundRect(x, y, width, height, radius, color);
+  lcd->fillRoundRect(x, y, width, height, radius, color);
 }
 
 
@@ -2950,7 +3147,7 @@ void TeensyUserInterface::lcdDrawFilledRoundedRectangle(int x, int y, int width,
 //
 void TeensyUserInterface::lcdDrawFilledTriangle(int x0, int y0, int x1, int y1, int x2, int y2, uint16_t color)
 {
-  lcd.fillTriangle(x0, y0, x1, y1, x2, y2, color);
+  lcd->fillTriangle(x0, y0, x1, y1, x2, y2, color);
 }
 
 
@@ -2963,7 +3160,23 @@ void TeensyUserInterface::lcdDrawFilledTriangle(int x0, int y0, int x1, int y1, 
 //
 void TeensyUserInterface::lcdDrawFilledCircle(int x, int y, int radius, uint16_t color)
 {
-  lcd.fillCircle(x, y, radius, color);
+  lcd->fillCircle(x, y, radius, color);
+}
+
+
+
+
+//
+// draw an image
+//  Enter:  x, y = coords of upper left corner on LCD where the image will be displayed
+//          width, height =  size of the image, this must be the same as the image data
+//          image -> image data, 2 bytes/pixel in the RGB565 format stored in PROGMEM
+// Note: use this utility to convert an image to C sourse code:
+//       www.rinkydinkelectronics.com/_t_doimageconverter565.php
+//
+void TeensyUserInterface::lcdDrawImage(int x, int y, int width, int height, const uint16_t *image)
+{
+  lcd->writeRect(x, y, width, height, image);
 }
 
 
@@ -2976,7 +3189,7 @@ void TeensyUserInterface::lcdDrawFilledCircle(int x, int y, int radius, uint16_t
 //
 void TeensyUserInterface::lcdSetFont(const ui_font &font)
 {
-  lcd.setFont(font);
+  lcd->setFont(font);
   currentFont = &font;
 }
 
@@ -2988,7 +3201,7 @@ void TeensyUserInterface::lcdSetFont(const ui_font &font)
 //
 void TeensyUserInterface::lcdSetFontColor(uint16_t color)
 {
-  lcd.setTextColor(color);
+  lcd->setTextColor(color);
 }
 
 
@@ -2999,12 +3212,12 @@ void TeensyUserInterface::lcdSetFontColor(uint16_t color)
 //
 void TeensyUserInterface::lcdPrint(char *s)
 {
-  lcd.print(s);
+  lcd->print(s);
 }
 
 void TeensyUserInterface::lcdPrint(const char *s)
 {
-  lcd.print(s);
+  lcd->print(s);
 }
 
 
@@ -3156,7 +3369,7 @@ void TeensyUserInterface::lcdPrintCentered(double n, int digitsRightOfDecimal)
 //
 void TeensyUserInterface::lcdPrintCharacter(byte character)
 {
-  lcd.drawFontChar(character);
+  lcd->drawFontChar(character);
 }
 
 
@@ -3166,12 +3379,12 @@ void TeensyUserInterface::lcdPrintCharacter(byte character)
 //
 int TeensyUserInterface::lcdStringWidthInPixels(char *s)
 {
-  return(lcd.strPixelLen(s));
+  return(lcd->strPixelLen(s));
 }
 
 int TeensyUserInterface::lcdStringWidthInPixels(const char *s)
 {
-  return(lcd.strPixelLen((char *) s));
+  return(lcd->strPixelLen((char *) s));
 }
 
 
@@ -3206,7 +3419,7 @@ void TeensyUserInterface::lcdSetCursorXY(int x, int y)
   if ((x < 0) || (x >= lcdWidth)) return;
   if ((y < 0) || (y >= lcdHeight)) return;
   
-  lcd.setCursor(x, y);
+  lcd->setCursor(x, y);
 }
 
 
@@ -3221,7 +3434,7 @@ void TeensyUserInterface::lcdGetCursorXY(int *x, int *y)
   int16_t x1;
   int16_t y1;
 
-  lcd.getCursor(&x1, &y1);
+  lcd->getCursor(&x1, &y1);
   *x = x1;
   *y = y1;
 }

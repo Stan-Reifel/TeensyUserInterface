@@ -3,7 +3,7 @@
 //      *                                                                *
 //      *   Example shows how to prompt the user for numbers and values  *
 //      *                                                                *
-//      *            S. Reifel & Co.                8/8/2019             *
+//      *            S. Reifel & Co.                2/18/2022            *
 //      *                                                                *
 //      ******************************************************************
 
@@ -36,9 +36,16 @@ TeensyUserInterface ui;
 void setup() 
 {
   //
-  // initialize the user interface, including setting the screen orientation and font
+  // pin numbers used in addition to the default SPI pins
   //
-  ui.begin(LCD_ORIENTATION_LANDSCAPE_4PIN_RIGHT, Arial_9_Bold);
+  const int LCD_CS_PIN = 10;
+  const int LCD_DC_PIN = 9;
+  const int TOUCH_CS_PIN = 8;
+  
+  //
+  // setup the LCD orientation, the default font and initialize the user interface
+  //
+  ui.begin(LCD_CS_PIN, LCD_DC_PIN, TOUCH_CS_PIN, LCD_ORIENTATION_LANDSCAPE_4PIN_RIGHT, Arial_9_Bold);
 
   //
   // use a grayscale color palette
